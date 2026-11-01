@@ -3,6 +3,30 @@ import requests
 
 app = FastAPI()
 
+# チェックしたいヘッダーのルールを、データとしてまとめて定義
+HEADER_CHECKS = [
+    {
+        "name": "Strict-Transport-Security",
+        "severity": "high",
+        "fail_message": "HSTSヘッダーが設定されていません。",
+        # 合格かどうかを判定する関数(値を受け取ってTrue/Falseを返す)
+        "is_valid": lambda value: value is not None,
+    },
+    {
+        "name": "X-Content-Type-Options",
+        "severity": "medium",
+        "fail_message": "nosniffが設定されていません。MIMEタイプスニッフィングのリスクがあります。",
+        "is_valid": lambda value: value == "nosniff",
+    },
+    {
+        "name": "X-Frame-Options",
+        "severity": "medium",
+        "fail_message": "X-Frame-Optionsが設定されていません。クリックジャッキングのリスクがあります。",
+        "is_valid": lambda value: value is not None and value.upper() in ("DENY", "SAMEORIGIN"),
+    },
+]
+
+
 @app.get("/")
 def read_root():
     return {"message": "Hello, Security Scanner!"}
@@ -15,39 +39,23 @@ def scan(url: str):
 
     results = []
 
-    # HSTSチェック
-    hsts = headers.get("Strict-Transport-Security")
-    if hsts is None:
-        results.append({
-            "name": "Strict-Transport-Security",
-            "status": "fail",
-            "severity": "high",
-            "message": "HSTSヘッダーが設定されていません。"
-        })
-    else:
-        results.append({
-            "name": "Strict-Transport-Security",
-            "status": "pass",
-            "severity": "high",
-            "message": f"設定済み: {hsts}"
-        })
+    for check in HEADER_CHECKS:
+        value = headers.get(check["name"])
 
-    # X-Content-Type-Options チェック
-    xcto = headers.get("X-Content-Type-Options")
-    if xcto != "nosniff":
-        results.append({
-            "name": "X-Content-Type-Options",
-            "status": "fail",
-            "severity": "medium",
-            "message": "nosniffが設定されていません。MIMEタイプスニッフィングのリスクがあります。"
-    })
-    else:
-        results.append({
-            "name": "X-Content-Type-Options",
-            "status": "pass",
-            "severity": "medium",
-            "message": "設定済み"
-        })
+        if check["is_valid"](value):
+            results.append({
+                "name": check["name"],
+                "status": "pass",
+                "severity": check["severity"],
+                "message": f"設定済み: {value}",
+            })
+        else:
+            results.append({
+                "name": check["name"],
+                "status": "fail",
+                "severity": check["severity"],
+                "message": check["fail_message"],
+            })
 
     return {
         "url": url,
