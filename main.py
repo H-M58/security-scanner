@@ -10,13 +10,13 @@ HEADER_CHECKS = [
         "severity": "high",
         "fail_message": "HSTSヘッダーが設定されていません。",
         # 合格かどうかを判定する関数(値を受け取ってTrue/Falseを返す)
-        "is_valid": lambda value: value is not None,
+        "is_valid": lambda value: bool(value),
     },
     {
         "name": "X-Content-Type-Options",
         "severity": "medium",
         "fail_message": "nosniffが設定されていません。MIMEタイプスニッフィングのリスクがあります。",
-        "is_valid": lambda value: value == "nosniff",
+        "is_valid": lambda value: value is not None and value.lower() == "nosniff",
     },
     {
         "name": "X-Frame-Options",
